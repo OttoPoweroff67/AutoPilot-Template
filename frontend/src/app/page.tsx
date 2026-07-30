@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, useInView } from 'framer-motion'
 import apiClient from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
@@ -193,6 +193,108 @@ function HeroSection({ userName }: { userName?: string }) {
   )
 }
 
+// Live Workflow Card
+function WorkflowRunCard() {
+  const [isRunning, setIsRunning] = useState(false)
+  const [status, setStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle')
+  const [summary, setSummary] = useState('Waiting for the first live run...')
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null)
+
+  const runWorkflow = useCallback(async () => {
+    setIsRunning(true)
+    setStatus('running')
+    setSummary('Triggering your Supervity workflow...')
+
+    try {
+      const response = await fetch('/api/ai/workflow', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          workflowId: '019f7856-f4ce-7000-9a28-d0806318636d',
+          inputs: {
+            cfo_email: 'joshuaboss1111@gmail.com',
+            slack_channel: 'all-tehtariktech',
+            onedrive_folder_path: 'https://onedrive.live.com/personal/1ef4fc011579d9f9/Documents/Company%20Ledgers',
+            email_search_query: 'joshuang.supervity@hotmail.com',
+          },
+        }),
+      })
+
+      const payload = await response.json()
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || 'The workflow could not be executed.')
+      }
+
+      setStatus('success')
+      setLastUpdated(new Date().toLocaleString())
+
+      if (typeof payload.data === 'string' && payload.data) {
+        setSummary(payload.data)
+      } else if (payload.data && typeof payload.data === 'object') {
+        setSummary(JSON.stringify(payload.data, null, 2))
+      } else {
+        setSummary('Workflow completed successfully. The response payload was empty.')
+      }
+    } catch (error) {
+      setStatus('error')
+      setSummary(error instanceof Error ? error.message : 'The workflow could not be executed.')
+    } finally {
+      setIsRunning(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void runWorkflow()
+  }, [runWorkflow])
+
+  return (
+    <Card className='relative col-span-12 overflow-hidden'>
+      <CardWatermark opacity={3} scale={1.05} />
+      <CardHeader className='relative z-10'>
+        <div className='flex items-center justify-between gap-4'>
+          <div>
+            <CardTitle className='flex items-center gap-2'>
+              <Icons.sparkles className='h-5 w-5 text-brand-cornflower' strokeWidth={1.5} />
+              Live AI Workflow
+            </CardTitle>
+            <p className='mt-1 text-sm text-muted-foreground'>
+              Triggering your Supervity workflow from the dashboard and mirroring the result in real time.
+            </p>
+          </div>
+          <Button onClick={() => { void runWorkflow() }} disabled={isRunning} variant='gradient' size='sm'>
+            {isRunning ? 'Running...' : 'Run Now'}
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className='relative z-10 space-y-4'>
+        <div className={cn(
+          'rounded-xl border p-4',
+          status === 'success' && 'border-emerald-200 bg-emerald-50',
+          status === 'error' && 'border-red-200 bg-red-50',
+          status === 'running' && 'border-brand-cornflower/30 bg-brand-cornflower/10',
+          status === 'idle' && 'border-border/60 bg-muted/30'
+        )}>
+          <div className='flex items-center justify-between gap-3'>
+            <p className='text-sm font-medium text-foreground'>Latest run status</p>
+            <span className='rounded-full bg-white/80 px-2.5 py-1 text-xs font-semibold uppercase tracking-wider text-brand-navy'>
+              {status}
+            </span>
+          </div>
+          <pre className='mt-3 overflow-x-auto whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground'>
+            <code>{summary}</code>
+          </pre>
+          {lastUpdated && (
+            <p className='mt-3 text-xs text-muted-foreground'>Last updated: {lastUpdated}</p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 // Diagnostics Card
 function DiagnosticsCard() {
   const [apiResponse, setApiResponse] = useState<string>('')
@@ -348,11 +450,12 @@ export default function HomePage() {
         <ActivityChart className='col-span-12' />
       </motion.div>
 
-      {/* System Diagnostics */}
+      {/* Live Workflow + Diagnostics */}
       <motion.div
         className='grid gap-6 lg:grid-cols-12'
         variants={itemVariants}
       >
+        <WorkflowRunCard />
         <DiagnosticsCard />
       </motion.div>
     </motion.div>
