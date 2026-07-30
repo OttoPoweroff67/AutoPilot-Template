@@ -1,4 +1,0 @@
-# Development and Testing Dependencies
-pytest
-pytest-asyncio
-httpx
