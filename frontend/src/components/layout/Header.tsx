@@ -104,13 +104,13 @@ function AIManagerTrigger() {
               isManagerOpen && 'ring-2 ring-brand-cornflower ring-offset-2',
               'focus:outline-none focus:ring-2 focus:ring-brand-cornflower focus:ring-offset-2'
             )}
-            aria-label='Open AI Manager'
+            aria-label='Open Assistant'
           >
             <Icons.sparkles
               className='h-4 w-4 text-white'
               strokeWidth={1.5}
             />
-            <span className='hidden sm:inline'>AI Manager</span>
+            <span className='hidden sm:inline'>Assistant</span>
             <kbd className={cn(
               'hidden sm:inline-flex items-center gap-0.5',
               'px-1.5 py-0.5 rounded',
@@ -122,7 +122,7 @@ function AIManagerTrigger() {
           </button>
         </TooltipTrigger>
         <TooltipContent side='bottom' className='sm:hidden'>
-          <span>AI Manager</span>
+          <span>Assistant</span>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

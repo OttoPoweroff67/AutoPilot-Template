@@ -76,7 +76,7 @@ export default function AIManagerPage() {
     <motion.div className='space-y-6' initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
       <div className='flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between'>
         <div>
-          <h1 className='text-display-3 font-bold tracking-tight text-brand-navy'>AI Manager</h1>
+          <h1 className='text-display-3 font-bold tracking-tight text-brand-navy'>Assistant</h1>
           <p className='mt-2 text-lg text-muted-foreground'>Orchestration hub for the live Supervity workflow and agent handoff experience.</p>
         </div>
         <Button variant='gradient' onClick={() => void runWorkflow()} disabled={isRunning}>

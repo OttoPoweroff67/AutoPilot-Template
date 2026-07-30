@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import type { ReactNode } from 'react'
 import { motion, useInView } from 'framer-motion'
 import apiClient from '@/lib/api-client'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CardWatermark } from '@/components/ui/card-watermark'
 import { Icons } from '@/components/ui/icons'
-import { ActivityChart } from '@/components/ActivityChart'
 import { cn } from '@/lib/utils'
 
 // Animation variants
@@ -47,13 +48,14 @@ function AnimatedNumber({
   const [displayValue, setDisplayValue] = useState(0)
   const ref = useRef<HTMLSpanElement>(null)
   const isInView = useInView(ref, { once: true, amount: 0.5 })
-  const hasAnimated = useRef(false)
 
   useEffect(() => {
-    if (!isInView || hasAnimated.current) return
-    hasAnimated.current = true
+    if (!isInView) return
+
+    setDisplayValue(0)
 
     const startTime = performance.now()
+    let frameId = 0
 
     const animate = (currentTime: number) => {
       const elapsed = currentTime - startTime
@@ -63,13 +65,17 @@ function AnimatedNumber({
       setDisplayValue(Math.round(eased * value))
 
       if (progress < 1) {
-        requestAnimationFrame(animate)
+        frameId = requestAnimationFrame(animate)
       } else {
         setDisplayValue(value)
       }
     }
 
-    requestAnimationFrame(animate)
+    frameId = requestAnimationFrame(animate)
+
+    return () => {
+      cancelAnimationFrame(frameId)
+    }
   }, [value, duration, isInView])
 
   const formatValue = (num: number): string => {
@@ -90,12 +96,13 @@ function AnimatedNumber({
 // Stats Card Component with Bento styling
 interface StatCardProps {
   title: string
-  value: number
+  value: number | string
   suffix?: string
   icon: React.ElementType
   trend?: { value: string; positive: boolean }
   colorClass: string
   delay?: number
+  subtitle?: string
 }
 
 function StatCard({
@@ -106,6 +113,7 @@ function StatCard({
   trend,
   colorClass,
   delay = 0,
+  subtitle,
 }: StatCardProps) {
   return (
     <motion.div
@@ -127,8 +135,11 @@ function StatCard({
               </p>
               {/* Display number */}
               <p className='font-display text-[2.25rem] font-bold leading-none tracking-tight text-brand-navy'>
-                <AnimatedNumber value={value} suffix={suffix} />
+                {typeof value === 'number' ? <AnimatedNumber value={value} suffix={suffix} /> : value}
               </p>
+              {subtitle && (
+                <p className='text-xs text-muted-foreground'>{subtitle}</p>
+              )}
               {/* Trend */}
               {trend && (
                 <motion.p
@@ -193,203 +204,93 @@ function HeroSection({ userName }: { userName?: string }) {
   )
 }
 
-// Live Workflow Card
-function WorkflowRunCard() {
-  const [isRunning, setIsRunning] = useState(false)
-  const [status, setStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle')
-  const [summary, setSummary] = useState('Waiting for the first live run...')
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null)
-
-  const runWorkflow = useCallback(async () => {
-    setIsRunning(true)
-    setStatus('running')
-    setSummary('Triggering your Supervity workflow...')
-
-    try {
-      const response = await fetch('/api/ai/workflow', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          workflowId: '019f7856-f4ce-7000-9a28-d0806318636d',
-          inputs: {
-            cfo_email: 'joshuaboss1111@gmail.com',
-            slack_channel: 'all-tehtariktech',
-            onedrive_folder_path: 'https://onedrive.live.com/personal/1ef4fc011579d9f9/Documents/Company%20Ledgers',
-            email_search_query: 'joshuang.supervity@hotmail.com',
-          },
-        }),
-      })
-
-      const payload = await response.json()
-
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.error || 'The workflow could not be executed.')
-      }
-
-      setStatus('success')
-      setLastUpdated(new Date().toLocaleString())
-
-      if (typeof payload.data === 'string' && payload.data) {
-        setSummary(payload.data)
-      } else if (payload.data && typeof payload.data === 'object') {
-        setSummary(JSON.stringify(payload.data, null, 2))
-      } else {
-        setSummary('Workflow completed successfully. The response payload was empty.')
-      }
-    } catch (error) {
-      setStatus('error')
-      setSummary(error instanceof Error ? error.message : 'The workflow could not be executed.')
-    } finally {
-      setIsRunning(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void runWorkflow()
-  }, [runWorkflow])
+function AutonomousOperatorsCard() {
+  const operators = [
+    {
+      name: 'Orchestrator (BOSS)',
+      status: 'Scheduled',
+      description: 'Runs Impact Assessment Operator (IAO) to evaluate supply chain disruptions & generate markdown impact.',
+      badge: 'Operator #0',
+    },
+    {
+      name: 'Overwatch Operator (OO)',
+      status: 'Ready',
+      description: 'Scans Microsoft Outlook for unread disruption notices and uses AI to extract supplier ID, item number, and description.',
+      badge: 'Operator #1',
+    },
+    {
+      name: 'Impact Assessment Operator (IAO)',
+      status: 'Ready',
+      description: 'Continuously monitors disruption_notices Supabase table for unhandled items. Isolates critical issues.',
+      badge: 'Operator #2',
+    },
+    {
+      name: 'Alternative Sourcing Operator (ASO)',
+      status: 'Ready',
+      description: 'Parses issue reports, checks contract terms, evaluates stock buffers, and finds backup suppliers.',
+      badge: 'Operator #3',
+    },
+    {
+      name: 'Communications Operator (CO)',
+      status: 'Ready',
+      description: 'Reads uploaded Markdown file, checks if manual approval needed, and routes to human approver via Slack.',
+      badge: 'Operator #4',
+    },
+    {
+      name: 'Financial Operator (FO)',
+      status: 'Ready',
+      description: 'Processes Markdown detailing supplier changes, uses AI to extract details, generates insights and PDFs.',
+      badge: 'Operator #5',
+    },
+  ]
 
   return (
     <Card className='relative col-span-12 overflow-hidden'>
       <CardWatermark opacity={3} scale={1.05} />
       <CardHeader className='relative z-10'>
-        <div className='flex items-center justify-between gap-4'>
+        <div className='flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between'>
           <div>
             <CardTitle className='flex items-center gap-2'>
-              <Icons.sparkles className='h-5 w-5 text-brand-cornflower' strokeWidth={1.5} />
-              Live AI Workflow
+              <Icons.users className='h-5 w-5 text-brand-cornflower' strokeWidth={1.5} />
+              My Autonomous Operators (6 Total)
             </CardTitle>
-            <p className='mt-1 text-sm text-muted-foreground'>
-              Triggering your Supervity workflow from the dashboard and mirroring the result in real time.
+            <p className='mt-2 text-sm text-muted-foreground'>
+              6 / 6 Ready • Manage AI operators, adjust workgraphs, and view their real-time execution status.
             </p>
           </div>
-          <Button onClick={() => { void runWorkflow() }} disabled={isRunning} variant='gradient' size='sm'>
-            {isRunning ? 'Running...' : 'Run Now'}
-          </Button>
+          <Link href='/ai/manager'>
+            <Button variant='gradient' size='sm'>
+              Open AI Manager
+            </Button>
+          </Link>
         </div>
       </CardHeader>
-      <CardContent className='relative z-10 space-y-4'>
-        <div className={cn(
-          'rounded-xl border p-4',
-          status === 'success' && 'border-emerald-200 bg-emerald-50',
-          status === 'error' && 'border-red-200 bg-red-50',
-          status === 'running' && 'border-brand-cornflower/30 bg-brand-cornflower/10',
-          status === 'idle' && 'border-border/60 bg-muted/30'
-        )}>
-          <div className='flex items-center justify-between gap-3'>
-            <p className='text-sm font-medium text-foreground'>Latest run status</p>
-            <span className='rounded-full bg-white/80 px-2.5 py-1 text-xs font-semibold uppercase tracking-wider text-brand-navy'>
-              {status}
-            </span>
-          </div>
-          <pre className='mt-3 overflow-x-auto whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground'>
-            <code>{summary}</code>
-          </pre>
-          {lastUpdated && (
-            <p className='mt-3 text-xs text-muted-foreground'>Last updated: {lastUpdated}</p>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-// Diagnostics Card
-function DiagnosticsCard() {
-  const [apiResponse, setApiResponse] = useState<string>('')
-  const [adminResponse, setAdminResponse] = useState<string>('')
-  const [isLoading, setIsLoading] = useState(false)
-
-  const callApi = async (
-    endpoint: string,
-    setter: React.Dispatch<React.SetStateAction<string>>
-  ) => {
-    setIsLoading(true)
-    setter('Loading...')
-    try {
-      const data = await apiClient(endpoint)
-      setter(JSON.stringify(data, null, 2))
-    } catch (error) {
-      setter(
-        `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-      )
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  return (
-    <Card className='relative col-span-12 h-full overflow-hidden'>
-      <CardWatermark opacity={3} scale={1.1} />
-      <CardHeader className='relative z-10'>
-        <CardTitle className='flex items-center gap-2'>
-          <Icons.activity
-            className='h-5 w-5 text-brand-cornflower'
-            strokeWidth={1.5}
-          />
-          System Diagnostics
-        </CardTitle>
-      </CardHeader>
-      <CardContent className='relative z-10 space-y-6'>
-        <div className='space-y-3'>
-          <div className='flex items-center justify-between'>
-            <div>
-              <p className='text-sm font-medium text-foreground'>
-                Standard Authorization
-              </p>
-              <p className='mt-0.5 font-mono text-xs text-muted-foreground'>
-                /api/test
-              </p>
-            </div>
-          </div>
-          <Button
-            onClick={() => callApi('/api/test', setApiResponse)}
-            disabled={isLoading}
-            variant='outline'
-            className='w-full'
+      <CardContent className='relative z-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
+        {operators.map((operator) => (
+          <div
+            key={operator.name}
+            className='rounded-xl border border-border/60 bg-background/70 p-4 shadow-sm'
           >
-            {isLoading ? 'Running...' : 'Run Diagnostics'}
-          </Button>
-          {apiResponse && (
-            <div className='rounded-xl border border-border/50 bg-muted/30 p-4'>
-              <pre className='overflow-x-auto font-mono text-xs text-muted-foreground'>
-                <code>{apiResponse}</code>
-              </pre>
+            <div className='flex items-start justify-between gap-3'>
+              <div>
+                <p className='text-sm font-semibold text-foreground'>{operator.name}</p>
+                <p className='mt-1 text-xs font-medium uppercase tracking-wide text-emerald-600'>
+                  {operator.status}
+                </p>
+              </div>
+              <span className='rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground'>
+                {operator.badge}
+              </span>
             </div>
-          )}
-        </div>
-
-        <div className='h-px bg-border/50' />
-
-        <div className='space-y-3'>
-          <div className='flex items-center justify-between'>
-            <div>
-              <p className='text-sm font-medium text-foreground'>
-                Admin Verification
-              </p>
-              <p className='mt-0.5 font-mono text-xs text-muted-foreground'>
-                /api/admin/dashboard
-              </p>
+            <p className='mt-3 text-sm leading-6 text-muted-foreground'>
+              {operator.description}
+            </p>
+            <div className='mt-4 flex items-center justify-between text-sm'>
+              <span className='font-medium text-brand-navy'>Automated Workgraph</span>
+              <Icons.arrowRight className='h-4 w-4 text-brand-cornflower' strokeWidth={1.5} />
             </div>
           </div>
-          <Button
-            onClick={() => callApi('/api/admin/dashboard', setAdminResponse)}
-            disabled={isLoading}
-            variant='gradient'
-            className='w-full'
-          >
-            {isLoading ? 'Verifying...' : 'Verify Admin Access'}
-            <Icons.arrowRight className='ml-2 h-4 w-4' />
-          </Button>
-          {adminResponse && (
-            <div className='rounded-xl border border-border/50 bg-muted/30 p-4'>
-              <pre className='overflow-x-auto font-mono text-xs text-muted-foreground'>
-                <code>{adminResponse}</code>
-              </pre>
-            </div>
-          )}
-        </div>
+        ))}
       </CardContent>
     </Card>
   )
@@ -397,6 +298,46 @@ function DiagnosticsCard() {
 
 // Main Dashboard — no auth required, renders directly
 export default function HomePage() {
+  const [liveStats, setLiveStats] = useState<{
+    accomplishedCases: number
+    solvedPercentage: number
+    totalNotices: number
+    autonomousOperators: string[]
+  } | null>(null)
+  const [statsError, setStatsError] = useState<string | null>(null)
+
+  const fetchLiveStats = useCallback(async () => {
+    try {
+      const response = await fetch('/api/supabase/dashboard-stats')
+      const payload = await response.json()
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || 'Unable to load live dashboard metrics')
+      }
+
+      setLiveStats(payload.data)
+      setStatsError(null)
+    } catch (error) {
+      setStatsError(error instanceof Error ? error.message : 'Unable to load live dashboard metrics')
+    }
+  }, [])
+
+  useEffect(() => {
+    void fetchLiveStats()
+    const interval = window.setInterval(() => {
+      void fetchLiveStats()
+    }, 30000)
+
+    return () => window.clearInterval(interval)
+  }, [fetchLiveStats])
+
+  const stats = liveStats ?? {
+    accomplishedCases: 0,
+    solvedPercentage: 0,
+    totalNotices: 0,
+    autonomousOperators: ['BOSS', 'OO', 'IAO', 'ASO', 'CO', 'FO'],
+  }
+
   return (
     <motion.div
       className='space-y-6'
@@ -410,53 +351,47 @@ export default function HomePage() {
       {/* Stats Grid - Bento style */}
       <div className='grid grid-cols-2 gap-4 lg:grid-cols-4'>
         <StatCard
-          title='Total Users'
-          value={10400}
-          icon={Icons.users}
-          trend={{ value: '+12%', positive: true }}
+          title='Accomplished Cases'
+          value={stats.accomplishedCases}
+          icon={Icons.checkCircle}
+          trend={{ value: 'Live Supabase', positive: true }}
           colorClass='bg-brand-navy'
           delay={0.1}
         />
         <StatCard
-          title='Active Sessions'
-          value={524}
+          title='Percentage of Disruption Solved'
+          value={stats.solvedPercentage}
+          suffix='%'
           icon={Icons.activity}
-          trend={{ value: '+8%', positive: true }}
+          trend={{ value: 'Live data', positive: true }}
           colorClass='bg-brand-cornflower'
           delay={0.2}
         />
         <StatCard
-          title='Success Rate'
-          value={98}
-          suffix='%'
-          icon={Icons.checkCircle}
-          trend={{ value: '+2%', positive: true }}
+          title='Autonomous Operators'
+          value={stats.autonomousOperators.join(' • ')}
+          icon={Icons.users}
+          trend={{ value: '6 operators', positive: true }}
           colorClass='bg-brand-purple'
           delay={0.3}
+          subtitle='BOSS • OO • IAO • ASO • CO • FO'
         />
         <StatCard
-          title='AI Confidence'
-          value={96}
-          suffix='%'
+          title='Total Notices'
+          value={stats.totalNotices}
           icon={Icons.sparkles}
-          trend={{ value: 'Stable', positive: true }}
+          trend={{ value: 'Live notices', positive: true }}
           colorClass='bg-gradient-to-br from-brand-navy to-brand-purple'
           delay={0.4}
         />
       </div>
 
-      {/* Activity Chart - Full Width */}
-      <motion.div variants={itemVariants}>
-        <ActivityChart className='col-span-12' />
-      </motion.div>
+      {statsError && (
+        <p className='text-sm text-red-500'>{statsError}</p>
+      )}
 
-      {/* Live Workflow + Diagnostics */}
-      <motion.div
-        className='grid gap-6 lg:grid-cols-12'
-        variants={itemVariants}
-      >
-        <WorkflowRunCard />
-        <DiagnosticsCard />
+      <motion.div variants={itemVariants}>
+        <AutonomousOperatorsCard />
       </motion.div>
     </motion.div>
   )
