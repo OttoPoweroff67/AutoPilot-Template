@@ -86,10 +86,10 @@ export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
             </div>
             <div className='flex flex-col'>
               <SheetTitle className='font-display text-lg font-bold tracking-tight text-brand-navy'>
-                AutoPilot
+                B.O.S.S.
               </SheetTitle>
               <span className='text-[10px] font-medium uppercase tracking-widest text-brand-muted'>
-                Command Center
+                Supervity AutoPilot
               </span>
             </div>
           </Link>
@@ -123,6 +123,10 @@ export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
             </div>
           ))}
         </nav>
+
+        <div className='border-t border-black/[0.04] px-4 py-3 text-[10px] leading-relaxed text-brand-muted/80'>
+          © TehTarikTech 2026 | Agent Made End-to-End on Supervity Autos
+        </div>
       </SheetContent>
     </Sheet>
   )

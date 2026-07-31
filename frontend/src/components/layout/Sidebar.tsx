@@ -266,10 +266,10 @@ export function Sidebar() {
             {!isCollapsed && (
               <div className='flex flex-col transition-transform duration-200 group-hover:translate-x-0.5'>
                 <span className='font-display text-lg font-bold tracking-tight text-brand-navy'>
-                  AutoPilot
+                  B.O.S.S.
                 </span>
                 <span className='text-[10px] font-medium uppercase tracking-widest text-brand-muted'>
-                  Command Center
+                  Supervity AutoPilot
                 </span>
               </div>
             )}
@@ -308,6 +308,12 @@ export function Sidebar() {
         <div className='border-t border-black/[0.04] p-3'>
           <SidebarUser isCollapsed={isCollapsed} />
         </div>
+
+        {!isCollapsed && (
+          <div className='border-t border-black/[0.04] px-3 py-3 text-[10px] leading-relaxed text-brand-muted/80'>
+            © TehTarikTech 2026 | Agent Made End-to-End on Supervity Autos
+          </div>
+        )}
 
         {/* Collapse Toggle */}
         <div className='border-t border-black/[0.04] p-3'>
