@@ -1,8 +1,8 @@
 'use client'
 
 import { signIn } from 'next-auth/react'
-import { useSearchParams } from 'next/navigation'
-import { Suspense, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CardWatermark } from '@/components/ui/card-watermark'
@@ -11,13 +11,35 @@ import { Icons } from '@/components/ui/icons'
 import { Logomark } from '@/components/brand'
 
 function SignInContent() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get('callbackUrl') || '/'
+  const [email, setEmail] = useState('joshuang.supervity@hotmail.com')
+  const [password, setPassword] = useState('676767')
+  const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
 
-  // Auto-sign-in: immediately authenticate as Dev User
-  useEffect(() => {
-    signIn('autopilot-dev', { callbackUrl, redirect: true })
-  }, [callbackUrl])
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setIsLoading(true)
+    setError(null)
+
+    const result = await signIn('credentials', {
+      email,
+      password,
+      callbackUrl,
+      redirect: false,
+    })
+
+    setIsLoading(false)
+
+    if (result?.error) {
+      setError('Invalid email or password. Please try again.')
+      return
+    }
+
+    router.push(callbackUrl || '/')
+  }
 
   return (
     <motion.div
@@ -51,31 +73,55 @@ function SignInContent() {
               AutoPilot
             </CardTitle>
             <p className='mt-2 text-muted-foreground'>
-              Signing you in...
+              Sign in as the dev account to unlock the full workspace.
             </p>
           </motion.div>
         </CardHeader>
         <CardContent className='relative z-10 space-y-4 px-8 pb-8'>
-          {/* Loading spinner while auto-signing in */}
-          <div className='flex justify-center py-4'>
-            <div className='h-8 w-8 animate-spin rounded-full border-4 border-brand-navy border-t-transparent' />
-          </div>
-          
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4, duration: 0.4 }}
-          >
+          <form onSubmit={handleSubmit} className='space-y-4'>
+            <div className='space-y-2'>
+              <label className='text-sm font-medium text-brand-navy' htmlFor='email'>
+                Email
+              </label>
+              <input
+                id='email'
+                type='email'
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className='w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none ring-0 focus:border-brand-navy'
+                required
+              />
+            </div>
+
+            <div className='space-y-2'>
+              <label className='text-sm font-medium text-brand-navy' htmlFor='password'>
+                Password
+              </label>
+              <input
+                id='password'
+                type='password'
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className='w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none ring-0 focus:border-brand-navy'
+                required
+              />
+            </div>
+
+            {error && (
+              <p className='text-sm text-red-600'>{error}</p>
+            )}
+
             <Button
-              onClick={() => signIn('autopilot-dev', { callbackUrl, redirect: true })}
+              type='submit'
               variant='gradient'
               size='lg'
               className='group w-full py-6 text-base'
+              disabled={isLoading}
             >
-              Enter Command Center
+              {isLoading ? 'Signing in...' : 'Enter Command Center'}
               <Icons.arrowRight className='ml-2 h-4 w-4 transition-transform duration-200 group-hover:translate-x-1' />
             </Button>
-          </motion.div>
+          </form>
 
           <motion.p
             className='text-center text-xs text-muted-foreground'
@@ -83,7 +129,7 @@ function SignInContent() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5, duration: 0.4 }}
           >
-            Dev mode — no credentials required
+            Dev account: joshuang.supervity@hotmail.com / 676767
           </motion.p>
         </CardContent>
       </Card>

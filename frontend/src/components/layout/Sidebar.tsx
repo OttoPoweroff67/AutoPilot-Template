@@ -50,6 +50,7 @@ interface NavItem {
   label: string
   icon: React.ElementType
   adminOnly?: boolean
+  requiresAuth?: boolean
 }
 
 interface NavSection {
@@ -62,22 +63,22 @@ const navItems: NavSection[] = [
     title: 'Platform',
     items: [
       { href: '/', label: 'Dashboard', icon: Icons.dashboard },
-      { href: '/workbench', label: 'Workbench', icon: Icons.workbench },
+      { href: '/workbench', label: 'Workbench', icon: Icons.workbench, requiresAuth: true },
       { href: '/live-database', label: 'LIVE DATABASE', icon: Icons.database },
     ],
   },
   {
     title: 'AI Intelligence',
     items: [
-      { href: '/ai/manager', label: 'Assistant', icon: Icons.brain },
-      { href: '/ai/policies', label: 'AI Policies', icon: Icons.brain },
-      { href: '/ai/insights', label: 'AI Insights', icon: Icons.lightbulb },
+      { href: '/ai/manager', label: 'Assistant', icon: Icons.brain, requiresAuth: true },
+      { href: '/ai/policies', label: 'AI Policies', icon: Icons.brain, requiresAuth: true },
+      { href: '/ai/insights', label: 'AI Insights', icon: Icons.lightbulb, requiresAuth: true },
     ],
   },
   {
     title: 'System',
     items: [
-      { href: '/settings', label: 'Settings', icon: Icons.settings },
+      { href: '/settings', label: 'Settings', icon: Icons.settings, requiresAuth: true },
     ],
   },
 ]
@@ -217,12 +218,16 @@ export function Sidebar() {
 
   // Check if user is admin
   const isAdmin = session?.roles?.includes('admin')
+  const isAuthenticated = Boolean(session?.user)
 
-  // Filter navigation items based on user role
+  // Filter navigation items based on auth state and role
   const filteredNavItems = navItems
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) => !item.adminOnly || isAdmin),
+      items: section.items.filter((item) => {
+        if (item.requiresAuth && !isAuthenticated) return false
+        return !item.adminOnly || isAdmin
+      }),
     }))
     .filter((section) => section.items.length > 0)
 

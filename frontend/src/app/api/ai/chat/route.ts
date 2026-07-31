@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AQ.Ab8RN6INn6ZxTDp7XX6devN3V7U_2v1ZyB0NyuId5G-WZuIkzQ'
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY?.trim()
 
 function buildPrompt(message: string, history: Array<{ role: string; content: string }>, context?: { page?: string }) {
   const recentHistory = history.slice(-6).map((entry) => `${entry.role}: ${entry.content}`).join('\n')
@@ -18,6 +18,13 @@ export async function POST(request: NextRequest) {
 
     if (!message.trim()) {
       return NextResponse.json({ ok: false, error: 'A message is required.' }, { status: 400 })
+    }
+
+    if (!GEMINI_API_KEY) {
+      return NextResponse.json(
+        { ok: false, error: 'Gemini API key is not configured. Add GEMINI_API_KEY to your environment and restart the app.' },
+        { status: 500 }
+      )
     }
 
     const prompt = buildPrompt(message, history, context)

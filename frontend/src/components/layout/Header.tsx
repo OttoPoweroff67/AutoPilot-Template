@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { usePathname } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Avatar } from '@/components/ui/avatar'
@@ -131,7 +132,11 @@ function AIManagerTrigger() {
 
 // User menu with dropdown
 function UserMenu() {
-  const user = { name: 'Dev User', email: 'dev@autopilot.local' }
+  const { data: session } = useSession()
+  const user = {
+    name: session?.user?.name || 'Dev User',
+    email: session?.user?.email || 'joshuang.supervity@hotmail.com',
+  }
 
   return (
     <DropdownMenu>
@@ -206,7 +211,9 @@ interface HeaderProps {
 
 export function Header({ onOpenMobileMenu }: HeaderProps) {
   const pathname = usePathname()
+  const { data: session } = useSession()
   const breadcrumbs = getBreadcrumbs(pathname)
+  const isAuthenticated = Boolean(session?.user)
 
   return (
     <header
@@ -301,8 +308,20 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
         {/* Divider */}
         <div className='mx-1 hidden h-6 w-px bg-border/60 lg:block' />
 
-        {/* User menu */}
-        <UserMenu />
+        {!isAuthenticated ? (
+          <Button
+            variant='gradient'
+            size='sm'
+            onClick={() => {
+              window.location.href = '/auth/signin'
+            }}
+            className='whitespace-nowrap'
+          >
+            Sign In
+          </Button>
+        ) : (
+          <UserMenu />
+        )}
       </div>
     </header>
   )
