@@ -12,15 +12,12 @@ import {
 import { Button } from '@/components/ui/button'
 import { Icons } from '@/components/ui/icons'
 
-interface PendingNotice {
-  notice_id: string
-  received_at: string
-  channel: string
-  supplier_id: number
-  item_number: string
-  notice_type: string
-  message_body: string
-  case_status: string
+interface ApprovalItem {
+  id: string
+  title: string
+  description: string
+  actionUrl: string
+  source: string
 }
 
 const containerVariants = {
@@ -37,61 +34,91 @@ const itemVariants = {
 }
 
 export default function WorkbenchPage() {
-  const [items, setItems] = useState<PendingNotice[]>([])
+  const [items, setItems] = useState<ApprovalItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [feedback, setFeedback] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState<Record<string, boolean>>({})
+  const [debugInfo, setDebugInfo] = useState<string>('')
 
   useEffect(() => {
+    let isMounted = true
+
     async function loadPending() {
       setLoading(true)
       setError(null)
       try {
-        const response = await fetch('/api/supabase/disruption-notices/pending')
-        const payload = await response.json()
-        if (!response.ok) {
-          throw new Error(payload.error || 'Failed to load pending items')
+        const response = await fetch('/api/ai/workflow/webhook')
+        const text = await response.text()
+        let payload: Record<string, unknown> | null = null
+
+        if (text) {
+          try {
+            payload = JSON.parse(text) as Record<string, unknown>
+          } catch {
+            payload = null
+          }
         }
-        setItems(payload.data || [])
+
+        if (!response.ok) {
+          throw new Error((payload && typeof payload.error === 'string' ? payload.error : text) || 'Failed to load approvals')
+        }
+
+        const approvals = Array.isArray((payload && payload.approvals) ? payload.approvals : []) ? ((payload && payload.approvals) as ApprovalItem[]) : []
+        if (isMounted) {
+          setItems(approvals)
+          setDebugInfo(text ? `Webhook returned ${approvals.length} approval item(s)` : 'No body returned from webhook')
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load pending items')
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : 'Failed to load approvals')
+        }
       } finally {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false)
+        }
       }
     }
 
     void loadPending()
+    const intervalId = window.setInterval(() => {
+      void loadPending()
+    }, 5000)
+
+    return () => {
+      isMounted = false
+      window.clearInterval(intervalId)
+    }
   }, [])
 
-  const submitDecision = async (noticeId: string, decision: 'approve' | 'reject') => {
-    setSubmitting((prev) => ({ ...prev, [noticeId]: true }))
+  const handleDecision = async (approvalId: string, action: 'approve' | 'reject') => {
+    setSubmitting((prev) => ({ ...prev, [approvalId]: true }))
     try {
-      const response = await fetch('/api/ai/workflow/human-decision', {
+      const response = await fetch('/api/ai/workflow/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          noticeId,
-          decision,
-          message: feedback[noticeId] || `Human ${decision}d the workbench item`,
-        }),
+        body: JSON.stringify({ approval_id: approvalId, action }),
       })
 
-      const payload = await response.json()
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.error || 'Could not send the decision')
+      const text = await response.text()
+      let payload: Record<string, unknown> | null = null
+
+      if (text) {
+        try {
+          payload = JSON.parse(text) as Record<string, unknown>
+        } catch {
+          payload = null
+        }
       }
 
-      setItems((prev) => prev.filter((item) => item.notice_id !== noticeId))
-      setFeedback((prev) => {
-        const next = { ...prev }
-        delete next[noticeId]
-        return next
-      })
+      if (!response.ok || !(payload && payload.ok)) {
+        throw new Error((payload && typeof payload.error === 'string' ? payload.error : text) || 'Could not send the decision')
+      }
+
+      setItems((prev) => prev.filter((item) => item.id !== approvalId))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not send the decision')
     } finally {
-      setSubmitting((prev) => ({ ...prev, [noticeId]: false }))
+      setSubmitting((prev) => ({ ...prev, [approvalId]: false }))
     }
   }
 
@@ -107,7 +134,7 @@ export default function WorkbenchPage() {
           Workbench
         </h1>
         <p className='mt-2 text-lg text-muted-foreground'>
-          Human review queue for flagged AI recommendations and workflow interventions.
+          Human approvals that arrive from the Supervity workflow webhook.
         </p>
       </motion.div>
 
@@ -116,70 +143,61 @@ export default function WorkbenchPage() {
           <CardHeader>
             <CardTitle className='flex items-center gap-2'>
               <Icons.zap className='h-5 w-5 text-brand-cornflower' />
-              Pending Human Decisions
+              Supervity Approval Queue
             </CardTitle>
             <CardDescription>
-              Review the full context, then approve or reject the recommendation for the Supervity agent.
+              When Supervity sends a webhook with an action URL, it appears here and you can approve or reject it directly.
             </CardDescription>
           </CardHeader>
           <CardContent className='space-y-4'>
+            {debugInfo ? (
+              <div className='rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-700'>{debugInfo}</div>
+            ) : null}
             {loading ? (
-              <div className='rounded-lg border border-dashed border-border/70 p-6 text-sm text-muted-foreground'>Loading pending items...</div>
+              <div className='rounded-lg border border-dashed border-border/70 p-6 text-sm text-muted-foreground'>Loading approval requests...</div>
             ) : error ? (
               <div className='rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700'>{error}</div>
             ) : items.length === 0 ? (
-              <div className='rounded-lg border border-dashed border-border/70 p-6 text-sm text-muted-foreground'>No flagged items are waiting for review.</div>
+              <div className='rounded-lg border border-dashed border-border/70 p-6 text-sm text-muted-foreground'>No pending approval requests yet.</div>
             ) : (
               <div className='space-y-4'>
                 {items.map((item) => (
-                  <div key={item.notice_id} className='rounded-xl border border-border/70 bg-background/80 p-4 shadow-sm'>
+                  <div key={item.id} className='rounded-xl border border-border/70 bg-background/80 p-4 shadow-sm'>
                     <div className='flex flex-wrap items-start justify-between gap-3'>
                       <div>
-                        <p className='text-sm font-semibold text-brand-navy'>{item.notice_id}</p>
-                        <p className='mt-1 text-sm text-muted-foreground'>
-                          {item.item_number} • {item.notice_type} • {item.channel}
-                        </p>
+                        <p className='text-sm font-semibold text-brand-navy'>{item.title}</p>
+                        <p className='mt-1 text-sm text-muted-foreground'>{item.description}</p>
                       </div>
                       <div className='rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-amber-700'>
-                        {item.case_status}
+                        Pending
                       </div>
                     </div>
 
                     <div className='mt-4 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]'>
                       <div className='rounded-lg bg-muted/30 p-3 text-sm text-foreground'>
-                        <p className='font-medium'>Context</p>
-                        <p className='mt-2 whitespace-pre-wrap text-sm text-muted-foreground'>{item.message_body}</p>
-                        <div className='mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3'>
-                          <div><span className='font-medium text-foreground'>Received:</span> {item.received_at}</div>
-                          <div><span className='font-medium text-foreground'>Supplier:</span> {item.supplier_id}</div>
-                          <div><span className='font-medium text-foreground'>Status:</span> {item.case_status}</div>
-                        </div>
+                        <p className='font-medium'>Approval payload</p>
+                        <p className='mt-2 whitespace-pre-wrap text-sm text-muted-foreground'>
+                          This approval was delivered from {item.source}. When you press a decision below, the app will POST {JSON.stringify({ action: 'approve' })} or {JSON.stringify({ action: 'reject' })} to the action URL supplied by Supervity.
+                        </p>
                       </div>
 
                       <div className='space-y-3'>
-                        <label className='text-sm font-medium text-foreground'>Operator feedback</label>
-                        <textarea
-                          className='min-h-24 w-full rounded-lg border border-border/70 bg-background px-3 py-2 text-sm outline-none focus:border-brand-cornflower'
-                          value={feedback[item.notice_id] || ''}
-                          onChange={(event) => setFeedback((prev) => ({ ...prev, [item.notice_id]: event.target.value }))}
-                          placeholder='Add notes for the agent or explain the decision...'
-                        />
                         <div className='flex flex-wrap gap-2'>
                           <Button
                             variant='gradient'
                             size='sm'
-                            onClick={() => void submitDecision(item.notice_id, 'approve')}
-                            disabled={submitting[item.notice_id]}
+                            onClick={() => void handleDecision(item.id, 'approve')}
+                            disabled={submitting[item.id]}
                           >
-                            {submitting[item.notice_id] ? 'Sending...' : 'Approve'}
+                            {submitting[item.id] ? 'Sending...' : 'Approve'}
                           </Button>
                           <Button
                             variant='outline'
                             size='sm'
-                            onClick={() => void submitDecision(item.notice_id, 'reject')}
-                            disabled={submitting[item.notice_id]}
+                            onClick={() => void handleDecision(item.id, 'reject')}
+                            disabled={submitting[item.id]}
                           >
-                            {submitting[item.notice_id] ? 'Sending...' : 'Reject'}
+                            {submitting[item.id] ? 'Sending...' : 'Reject'}
                           </Button>
                         </div>
                       </div>

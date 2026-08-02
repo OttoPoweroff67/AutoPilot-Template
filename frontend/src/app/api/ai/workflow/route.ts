@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { upsertApproval } from './approval-store'
+import { extractApprovalFromPayload } from './approval-utils'
 
 const WORKFLOW_ENDPOINT = process.env.WORKFLOW_API_URL || 'https://auto-workflow-api.supervity.ai/api/v1/workflow-runs/execute/stream'
 const WORKFLOW_ID = process.env.WORKFLOW_ID || '019f7856-f4ce-7000-9a28-d0806318636d'
@@ -85,6 +87,8 @@ function parseWorkflowResponse(raw: string, contentType: string | null) {
   return raw
 }
 
+// approval parsing is handled by approval-utils
+
 export async function POST(request: NextRequest) {
   try {
     const { workflowId, inputs } = await extractWorkflowRequestPayload(request)
@@ -111,6 +115,11 @@ export async function POST(request: NextRequest) {
     const contentType = upstreamResponse.headers.get('content-type')
     const rawText = await upstreamResponse.text()
     const parsedPayload = parseWorkflowResponse(rawText, contentType)
+
+    const approvalPayload = extractApprovalFromPayload(parsedPayload, workflowId)
+    if (approvalPayload) {
+      upsertApproval(approvalPayload)
+    }
 
     let supabaseResult: unknown = null
     if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
