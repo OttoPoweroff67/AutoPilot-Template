@@ -42,10 +42,11 @@ export async function POST(request: NextRequest) {
       }),
     })
 
-    const payload = await response.json()
+    const payload = await response.json().catch(() => ({}))
 
     if (!response.ok) {
-      return NextResponse.json({ ok: false, error: payload?.error?.message || 'Gemini request failed.' }, { status: response.status })
+      const message = payload?.error?.message || 'Gemini request failed.'
+      return NextResponse.json({ ok: false, error: message }, { status: response.status })
     }
 
     const text = payload?.candidates?.[0]?.content?.parts?.[0]?.text || 'I could not generate a response.'

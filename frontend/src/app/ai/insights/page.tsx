@@ -142,13 +142,47 @@ export default function AIInsightsPage() {
 
   const handleAnalyze = async () => {
     setIsAnalyzing(true)
-    // Simulate analysis — replace with real API call
-    setTimeout(() => {
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: 'Analyze the current AutoPilot operations dashboard and return a concise insight summary with 3 recommendations.',
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data?.ok) {
+        throw new Error(data?.error || 'Unable to generate analysis.')
+      }
+
+      const summaryText = data.text || 'No analysis generated.'
+      const newInsight: Insight = {
+        id: `gemini-${Date.now()}`,
+        type: 'recommendation',
+        severity: 'info',
+        title: 'Gemini Analysis',
+        description: summaryText,
+        suggested_action: 'Review the AI-generated recommendation in the assistant view',
+        action_type: 'create_policy',
+        confidence: 0.88,
+        created_at: new Date().toISOString(),
+        is_demo: false,
+      }
+
+      setInsights([newInsight, ...DEMO_INSIGHTS])
+      setPatterns(DEMO_PATTERNS)
+      setActions(DEMO_ACTIONS)
+    } catch (error) {
       setInsights(DEMO_INSIGHTS)
       setPatterns(DEMO_PATTERNS)
       setActions(DEMO_ACTIONS)
+      console.error('Analysis failed:', error)
+    } finally {
       setIsAnalyzing(false)
-    }, 1500)
+    }
   }
 
   const handleInsightAction = useCallback(async (insight: Insight) => {

@@ -1,13 +1,14 @@
 // frontend/src/app/api/auth/[...nextauth]/route.ts
 // AutoPilot Template — hardcoded dev sign-in for the command center.
 
-import NextAuth, { AuthOptions } from 'next-auth'
+import NextAuth from 'next-auth'
+import type { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 
 const DEV_EMAIL = 'joshuang.supervity@hotmail.com'
 const DEV_PASSWORD = '676767'
 
-const authOptions: AuthOptions = {
+const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
       id: 'credentials',

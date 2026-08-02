@@ -8,6 +8,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Icons } from '@/components/ui/icons'
 
+interface GeminiChatResult {
+  ok: boolean
+  text?: string
+  error?: string
+}
+
 interface WorkflowResult {
   ok: boolean
   workflowId: string
@@ -38,6 +44,9 @@ export default function AIManagerPage() {
   const [result, setResult] = useState<WorkflowResult | null>(null)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [formValues, setFormValues] = useState<WorkflowFormValues>(defaultValues)
+  const [chatPrompt, setChatPrompt] = useState('Summarize the current operations status in one paragraph.')
+  const [chatResult, setChatResult] = useState<GeminiChatResult | null>(null)
+  const [isChatting, setIsChatting] = useState(false)
 
   const updateField = (field: keyof WorkflowFormValues, value: string) => {
     setFormValues((previous) => ({ ...previous, [field]: value }))
@@ -69,6 +78,28 @@ export default function AIManagerPage() {
       setResult({ ok: false, workflowId: formValues.workflowId, status: 500, error: error instanceof Error ? error.message : 'Unknown error' })
     } finally {
       setIsRunning(false)
+    }
+  }
+
+  const runGeminiChat = async () => {
+    if (!chatPrompt.trim()) return
+
+    setIsChatting(true)
+    setChatResult(null)
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: chatPrompt.trim() }),
+      })
+
+      const payload = await response.json().catch(() => ({}))
+      setChatResult({ ok: response.ok && payload?.ok, text: payload?.text, error: payload?.error })
+    } catch (error) {
+      setChatResult({ ok: false, error: error instanceof Error ? error.message : 'Unknown error' })
+    } finally {
+      setIsChatting(false)
     }
   }
 
@@ -132,22 +163,43 @@ export default function AIManagerPage() {
           <CardHeader>
             <CardTitle className='flex items-center gap-2'>
               <Icons.brain className='h-5 w-5 text-brand-cornflower' />
-              Agent Capabilities
+              Gemini Assistant
             </CardTitle>
-            <CardDescription>Core specialist functions available to the orchestration layer.</CardDescription>
+            <CardDescription>Ask the assistant page to summarize operations or generate guidance with Gemini.</CardDescription>
           </CardHeader>
-          <CardContent className='space-y-3'>
-            {[
-              { name: 'Workflow Orchestrator', role: 'Routes and coordinates the live agent workflow' },
-              { name: 'Human Review Hand-off', role: 'Escalates flagged decisions to the Workbench' },
-              { name: 'Supabase Context Layer', role: 'Reads and stores live operational context' },
-              { name: 'Decision Feedback Loop', role: 'Captures approvals and rejections for learning' },
-            ].map((capability) => (
-              <div key={capability.name} className='rounded-lg border border-border/70 p-3'>
-                <p className='font-medium text-foreground'>{capability.name}</p>
-                <p className='mt-1 text-sm text-muted-foreground'>{capability.role}</p>
+          <CardContent className='space-y-4'>
+            <div className='space-y-2'>
+              <Label htmlFor='gemini-prompt'>Prompt</Label>
+              <Input id='gemini-prompt' value={chatPrompt} onChange={(event) => setChatPrompt(event.target.value)} />
+            </div>
+
+            <Button variant='gradient' onClick={() => void runGeminiChat()} disabled={isChatting || !chatPrompt.trim()} className='w-full'>
+              {isChatting ? 'Thinking...' : 'Ask Gemini'}
+            </Button>
+
+            {chatResult && (
+              <div className='rounded-lg border border-border/70 bg-muted/30 p-4 text-sm'>
+                {chatResult.ok ? (
+                  <p className='whitespace-pre-wrap text-foreground'>{chatResult.text}</p>
+                ) : (
+                  <p className='text-red-600'>{chatResult.error || 'Unable to get a response.'}</p>
+                )}
               </div>
-            ))}
+            )}
+
+            <div className='space-y-3'>
+              {[
+                { name: 'Workflow Orchestrator', role: 'Routes and coordinates the live agent workflow' },
+                { name: 'Human Review Hand-off', role: 'Escalates flagged decisions to the Workbench' },
+                { name: 'Supabase Context Layer', role: 'Reads and stores live operational context' },
+                { name: 'Decision Feedback Loop', role: 'Captures approvals and rejections for learning' },
+              ].map((capability) => (
+                <div key={capability.name} className='rounded-lg border border-border/70 p-3'>
+                  <p className='font-medium text-foreground'>{capability.name}</p>
+                  <p className='mt-1 text-sm text-muted-foreground'>{capability.role}</p>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       </div>
