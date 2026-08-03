@@ -12,12 +12,16 @@ import {
 import { Button } from '@/components/ui/button'
 import { Icons } from '@/components/ui/icons'
 
-interface ApprovalItem {
+interface FormItem {
   id: string
+  formId: string
   title: string
   description: string
-  actionUrl: string
+  status: string
+  submittedAt: string
+  operatorName: string
   source: string
+  formUrl: string
 }
 
 const containerVariants = {
@@ -34,7 +38,7 @@ const itemVariants = {
 }
 
 export default function WorkbenchPage() {
-  const [items, setItems] = useState<ApprovalItem[]>([])
+  const [items, setItems] = useState<FormItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState<Record<string, boolean>>({})
@@ -47,7 +51,7 @@ export default function WorkbenchPage() {
       setLoading(true)
       setError(null)
       try {
-        const response = await fetch('/api/ai/workflow/webhook')
+        const response = await fetch('/api/ai/workflow/supervity-forms')
         const text = await response.text()
         let payload: Record<string, unknown> | null = null
 
@@ -60,17 +64,17 @@ export default function WorkbenchPage() {
         }
 
         if (!response.ok) {
-          throw new Error((payload && typeof payload.error === 'string' ? payload.error : text) || 'Failed to load approvals')
+          throw new Error((payload && typeof payload.error === 'string' ? payload.error : text) || 'Failed to load forms')
         }
 
-        const approvals = Array.isArray((payload && payload.approvals) ? payload.approvals : []) ? ((payload && payload.approvals) as ApprovalItem[]) : []
+        const forms = Array.isArray(payload?.data) ? (payload.data as FormItem[]) : []
         if (isMounted) {
-          setItems(approvals)
-          setDebugInfo(text ? `Webhook returned ${approvals.length} approval item(s)` : 'No body returned from webhook')
+          setItems(forms)
+          setDebugInfo(text ? `Loaded ${forms.length} pending form(s)` : 'No forms returned')
         }
       } catch (err) {
         if (isMounted) {
-          setError(err instanceof Error ? err.message : 'Failed to load approvals')
+          setError(err instanceof Error ? err.message : 'Failed to load forms')
         }
       } finally {
         if (isMounted) {
@@ -90,13 +94,13 @@ export default function WorkbenchPage() {
     }
   }, [])
 
-  const handleDecision = async (approvalId: string, action: 'approve' | 'reject') => {
-    setSubmitting((prev) => ({ ...prev, [approvalId]: true }))
+  const handleDecision = async (formId: string, action: 'approve' | 'reject') => {
+    setSubmitting((prev) => ({ ...prev, [formId]: true }))
     try {
-      const response = await fetch('/api/ai/workflow/approve', {
+      const response = await fetch('/api/ai/workflow/submit-decision', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ approval_id: approvalId, action }),
+        body: JSON.stringify({ form_id: formId, action }),
       })
 
       const text = await response.text()
@@ -114,11 +118,11 @@ export default function WorkbenchPage() {
         throw new Error((payload && typeof payload.error === 'string' ? payload.error : text) || 'Could not send the decision')
       }
 
-      setItems((prev) => prev.filter((item) => item.id !== approvalId))
+      setItems((prev) => prev.filter((item) => item.id !== formId))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not send the decision')
     } finally {
-      setSubmitting((prev) => ({ ...prev, [approvalId]: false }))
+      setSubmitting((prev) => ({ ...prev, [formId]: false }))
     }
   }
 
@@ -134,7 +138,7 @@ export default function WorkbenchPage() {
           Workbench
         </h1>
         <p className='mt-2 text-lg text-muted-foreground'>
-          Human approvals that arrive from the Supervity workflow webhook.
+          Pending Supervity forms waiting for human review.
         </p>
       </motion.div>
 
@@ -143,10 +147,10 @@ export default function WorkbenchPage() {
           <CardHeader>
             <CardTitle className='flex items-center gap-2'>
               <Icons.zap className='h-5 w-5 text-brand-cornflower' />
-              Supervity Approval Queue
+              Supervity Form Queue
             </CardTitle>
             <CardDescription>
-              When Supervity sends a webhook with an action URL, it appears here and you can approve or reject it directly.
+              Pending forms from Supervity appear here and can be approved or rejected directly.
             </CardDescription>
           </CardHeader>
           <CardContent className='space-y-4'>
@@ -158,7 +162,7 @@ export default function WorkbenchPage() {
             ) : error ? (
               <div className='rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700'>{error}</div>
             ) : items.length === 0 ? (
-              <div className='rounded-lg border border-dashed border-border/70 p-6 text-sm text-muted-foreground'>No pending approval requests yet.</div>
+              <div className='rounded-lg border border-dashed border-border/70 p-6 text-sm text-muted-foreground'>No pending forms yet.</div>
             ) : (
               <div className='space-y-4'>
                 {items.map((item) => (
@@ -169,16 +173,25 @@ export default function WorkbenchPage() {
                         <p className='mt-1 text-sm text-muted-foreground'>{item.description}</p>
                       </div>
                       <div className='rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-amber-700'>
-                        Pending
+                        {item.status}
                       </div>
                     </div>
 
                     <div className='mt-4 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]'>
                       <div className='rounded-lg bg-muted/30 p-3 text-sm text-foreground'>
-                        <p className='font-medium'>Approval payload</p>
-                        <p className='mt-2 whitespace-pre-wrap text-sm text-muted-foreground'>
-                          This approval was delivered from {item.source}. When you press a decision below, the app will POST {JSON.stringify({ action: 'approve' })} or {JSON.stringify({ action: 'reject' })} to the action URL supplied by Supervity.
+                        <p className='font-medium'>Form details</p>
+                        <p className='mt-2 text-sm text-muted-foreground'>
+                          Form ID: {item.formId || item.id}
                         </p>
+                        <p className='mt-1 text-sm text-muted-foreground'>
+                          Submitted: {item.submittedAt || 'n/a'}
+                        </p>
+                        <p className='mt-1 text-sm text-muted-foreground'>
+                          Operator: {item.operatorName || 'pending'}
+                        </p>
+                        <a className='mt-3 inline-flex text-sm font-medium text-brand-cornflower underline' href={item.formUrl} target='_blank' rel='noreferrer'>
+                          Open form in Supervity
+                        </a>
                       </div>
 
                       <div className='space-y-3'>
